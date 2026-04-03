@@ -198,7 +198,7 @@ describe("getMessageFeishu", () => {
     );
   });
 
-  it("returns text placeholder instead of raw JSON for unsupported message types", async () => {
+  it("returns media placeholders instead of raw JSON for media message types", async () => {
     mockClientGet.mockResolvedValueOnce({
       code: 0,
       data: {
@@ -225,7 +225,42 @@ describe("getMessageFeishu", () => {
         messageId: "om_file",
         chatId: "oc_file",
         contentType: "file",
-        content: "[file message]",
+        content: "<media:document>",
+      }),
+    );
+  });
+
+  it("returns the standard video placeholder for media message history", async () => {
+    mockClientGet.mockResolvedValueOnce({
+      code: 0,
+      data: {
+        items: [
+          {
+            message_id: "om_media",
+            chat_id: "oc_media",
+            msg_type: "media",
+            body: {
+              content: JSON.stringify({
+                file_key: "file_v3_video",
+                image_key: "img_v3_thumb",
+              }),
+            },
+          },
+        ],
+      },
+    });
+
+    const result = await getMessageFeishu({
+      cfg: {} as ClawdbotConfig,
+      messageId: "om_media",
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        messageId: "om_media",
+        chatId: "oc_media",
+        contentType: "media",
+        content: "<media:video>",
       }),
     );
   });
@@ -312,7 +347,7 @@ describe("getMessageFeishu", () => {
       expect.objectContaining({
         messageId: "om_file",
         contentType: "file",
-        content: "[file message]",
+        content: "<media:document>",
       }),
       expect.objectContaining({
         messageId: "om_card",
