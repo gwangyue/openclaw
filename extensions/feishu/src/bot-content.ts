@@ -1,7 +1,7 @@
 import type { ClawdbotConfig } from "../runtime-api.js";
 import { buildFeishuConversationId } from "./conversation-id.js";
 import { normalizeFeishuExternalKey } from "./external-keys.js";
-import { downloadMessageResourceFeishu } from "./media.js";
+import { downloadImageFeishu, downloadMessageResourceFeishu } from "./media.js";
 import { parsePostContent } from "./post.js";
 import { getFeishuRuntime } from "./runtime.js";
 import type { FeishuMediaInfo } from "./types.js";
@@ -368,11 +368,9 @@ export async function resolveFeishuMediaList(params: {
 
     for (const imageKey of imageKeys) {
       try {
-        const result = await downloadMessageResourceFeishu({
+        const result = await downloadImageFeishu({
           cfg,
-          messageId,
-          fileKey: imageKey,
-          type: "image",
+          imageKey,
           accountId,
         });
         const contentType =
@@ -430,25 +428,39 @@ export async function resolveFeishuMediaList(params: {
   }
 
   try {
-    const fileKey = mediaKeys.fileKey || mediaKeys.imageKey;
-    if (!fileKey) {
+    const result =
+      messageType === "image" && mediaKeys.imageKey
+        ? await downloadImageFeishu({
+            cfg,
+            imageKey: mediaKeys.imageKey,
+            accountId,
+          })
+        : await (async () => {
+            const fileKey = mediaKeys.fileKey || mediaKeys.imageKey;
+            if (!fileKey) {
+              return null;
+            }
+            return await downloadMessageResourceFeishu({
+              cfg,
+              messageId,
+              fileKey,
+              type: toMessageResourceType(messageType),
+              accountId,
+            });
+          })();
+    if (!result) {
       return [];
     }
-    const result = await downloadMessageResourceFeishu({
-      cfg,
-      messageId,
-      fileKey,
-      type: toMessageResourceType(messageType),
-      accountId,
-    });
     const contentType =
       result.contentType ?? (await core.media.detectMime({ buffer: result.buffer }));
+    const originalFileName =
+      "fileName" in result && typeof result.fileName === "string" ? result.fileName : undefined;
     const saved = await core.channel.media.saveMediaBuffer(
       result.buffer,
       contentType,
       "inbound",
       maxBytes,
-      result.fileName || mediaKeys.fileName,
+      originalFileName ?? mediaKeys.fileName,
     );
     out.push({
       path: saved.path,

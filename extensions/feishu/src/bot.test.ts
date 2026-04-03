@@ -182,6 +182,7 @@ const {
   mockSendMessageFeishu,
   mockGetMessageFeishu,
   mockListFeishuThreadMessages,
+  mockDownloadImageFeishu,
   mockDownloadMessageResourceFeishu,
   mockCreateFeishuClient,
   mockResolveAgentRoute,
@@ -200,6 +201,10 @@ const {
   mockSendMessageFeishu: vi.fn().mockResolvedValue({ messageId: "pairing-msg", chatId: "oc-dm" }),
   mockGetMessageFeishu: vi.fn().mockResolvedValue(null),
   mockListFeishuThreadMessages: vi.fn().mockResolvedValue([]),
+  mockDownloadImageFeishu: vi.fn().mockResolvedValue({
+    buffer: Buffer.from("image"),
+    contentType: "image/jpeg",
+  }),
   mockDownloadMessageResourceFeishu: vi.fn().mockResolvedValue({
     buffer: Buffer.from("video"),
     contentType: "video/mp4",
@@ -237,6 +242,7 @@ vi.mock("./send.js", () => ({
 }));
 
 vi.mock("./media.js", () => ({
+  downloadImageFeishu: mockDownloadImageFeishu,
   downloadMessageResourceFeishu: mockDownloadMessageResourceFeishu,
 }));
 
@@ -1227,6 +1233,12 @@ describe("handleFeishuMessage command authorization", () => {
     await dispatchMessage({ cfg, event });
 
     expect(mockDispatchReplyFromConfig).toHaveBeenCalledTimes(1);
+    expect(mockDownloadImageFeishu).toHaveBeenCalledWith(
+      expect.objectContaining({
+        imageKey: "img_v3_test",
+      }),
+    );
+    expect(mockDownloadMessageResourceFeishu).not.toHaveBeenCalled();
   });
 
   it("drops group image message when groupPolicy is open but requireMention is explicitly true", async () => {
@@ -1518,6 +1530,63 @@ describe("handleFeishuMessage command authorization", () => {
     expect(mockSaveMediaBuffer).toHaveBeenCalledWith(
       expect.any(Buffer),
       "video/mp4",
+      "inbound",
+      expect.any(Number),
+    );
+  });
+
+  it("downloads embedded post image tags via image API", async () => {
+    mockShouldComputeCommandAuthorized.mockReturnValue(false);
+
+    const cfg: ClawdbotConfig = {
+      channels: {
+        feishu: {
+          dmPolicy: "open",
+        },
+      },
+    } as ClawdbotConfig;
+
+    const event: FeishuMessageEvent = {
+      sender: {
+        sender_id: {
+          open_id: "ou-sender",
+        },
+      },
+      message: {
+        message_id: "msg-post-image",
+        chat_id: "oc-dm",
+        chat_type: "p2p",
+        message_type: "post",
+        content: JSON.stringify({
+          title: "Rich text",
+          content: [
+            [
+              {
+                tag: "img",
+                image_key: "img_post_payload",
+              },
+            ],
+          ],
+        }),
+      },
+    };
+
+    await dispatchMessage({ cfg, event });
+
+    expect(mockDownloadImageFeishu).toHaveBeenCalledWith(
+      expect.objectContaining({
+        imageKey: "img_post_payload",
+      }),
+    );
+    expect(mockDownloadMessageResourceFeishu).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageId: "msg-post-image",
+        fileKey: "img_post_payload",
+      }),
+    );
+    expect(mockSaveMediaBuffer).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      "image/jpeg",
       "inbound",
       expect.any(Number),
     );
