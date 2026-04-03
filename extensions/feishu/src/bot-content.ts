@@ -152,6 +152,10 @@ export function parseMessageContent(content: string, messageType: string): strin
     if (messageType === "merge_forward") {
       return "[Merged and Forwarded Message - loading...]";
     }
+    const mediaPlaceholder = inferPlaceholderForMessageType(messageType);
+    if (mediaPlaceholder) {
+      return mediaPlaceholder;
+    }
     return content;
   } catch {
     return content;
@@ -306,11 +310,7 @@ export function parseMediaKeys(
   }
 }
 
-export function toMessageResourceType(messageType: string): "image" | "file" {
-  return messageType === "image" ? "image" : "file";
-}
-
-function inferPlaceholder(messageType: string): string {
+function inferPlaceholderForMessageType(messageType: string): string | undefined {
   switch (messageType) {
     case "image":
       return "<media:image>";
@@ -324,8 +324,16 @@ function inferPlaceholder(messageType: string): string {
     case "sticker":
       return "<media:sticker>";
     default:
-      return "<media:document>";
+      return undefined;
   }
+}
+
+export function toMessageResourceType(messageType: string): "image" | "file" {
+  return messageType === "image" ? "image" : "file";
+}
+
+function inferPlaceholder(messageType: string): string {
+  return inferPlaceholderForMessageType(messageType) ?? "<media:document>";
 }
 
 export async function resolveFeishuMediaList(params: {

@@ -213,6 +213,24 @@ function parseInteractiveCardContent(parsed: unknown): string {
   return texts.join("\n").trim() || "[Interactive Card]";
 }
 
+function resolveFeishuMessageMediaPlaceholder(msgType: string): string | undefined {
+  switch (msgType) {
+    case "image":
+      return "<media:image>";
+    case "file":
+      return "<media:document>";
+    case "audio":
+      return "<media:audio>";
+    case "video":
+    case "media":
+      return "<media:video>";
+    case "sticker":
+      return "<media:sticker>";
+    default:
+      return undefined;
+  }
+}
+
 function parseFeishuMessageContent(rawContent: string, msgType: string): string {
   if (!rawContent) {
     return "";
@@ -236,6 +254,11 @@ function parseFeishuMessageContent(rawContent: string, msgType: string): string 
 
   if (msgType === "interactive") {
     return parseInteractiveCardContent(parsed);
+  }
+
+  const mediaPlaceholder = resolveFeishuMessageMediaPlaceholder(msgType);
+  if (mediaPlaceholder) {
+    return mediaPlaceholder;
   }
 
   if (typeof parsed === "string") {
